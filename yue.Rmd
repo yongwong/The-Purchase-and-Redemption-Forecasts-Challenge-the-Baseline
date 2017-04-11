@@ -1,0 +1,110 @@
+---
+title: "yue"
+author: "hdy"
+date: "2017年3月11日"
+output: html_document
+---
+```{r}
+rm(list=ls())
+for (i in 1:5) gc()
+
+library(data.table)
+library(plyr)
+
+
+#用户信息表
+
+user_money<-fread("D:/Documents/yue/Purchase&Redemption Data/user_balance_table.csv",data.table = FALSE)
+
+
+#设置日期参数
+riqi<-unique(user_money$report_date)
+riqi<-riqi[order(riqi)]
+user_money$month<-0
+user_money$day<-0
+user_money$month<-user_money[,2]%/%100
+user_money$day<-user_money[,2]%%100
+
+user_money$report_date<-as.character(user_money$report_date)
+user_money$report_date<-as.Date(user_money$report_date,format="%Y%m%d")
+user_money$week<-weekdays(user_money$report_date)
+user_money$week<-as.numeric(factor(user_money$week,levels = c("星期一","星期二","星期三","星期四","星期五","星期六","星期日"),labels = c(1:7)))
+
+
+#统计每天的申购，赎回总额
+gm<-tapply(user_money$total_purchase_amt,user_money$report_date,sum)
+sh<-tapply(user_money$total_redeem_amt,user_money$report_date,sum)
+
+shenggou<-as.numeric(as.character(gm))
+shuhui<-as.numeric(as.character(sh))
+
+shuju<-data.frame(riqi,shenggou,shuhui)
+
+#日期处理
+shuju$mon<-0
+shuju$day<-0
+shuju$mon<-shuju[,1]%/%100
+shuju$day<-shuju[,1]%%100
+
+shuju$riqi<-as.character(shuju$riqi)
+shuju$riqi<-as.Date(shuju$riqi,format="%Y%m%d")
+shuju$week<-weekdays(shuju$riqi)
+
+shuju$week<-as.numeric(factor(shuju$week,levels = c("星期一","星期二","星期三","星期四","星期五","星期六","星期日"),labels = c(1:7)))
+
+```
+
+
+```{r}
+#截取数据，由于前一半数据波动太大了
+#shu4<-shuju
+shu4<-shuju[shuju$mon>=201403,]
+shu4.week.sg<-tapply(shu4$shenggou,shu4$week,mean)
+shu4.mon.sg<-tapply(shu4$shenggou,shu4$mon,mean)
+shu4.day.sg<-tapply(shu4$shenggou,shu4$day,mean)
+
+shu4.week.sh<-tapply(shu4$shuhui,shu4$week,mean)
+shu4.mon.sh<-tapply(shu4$shuhui,shu4$mon,mean)
+shu4.day.sh<-tapply(shu4$shuhui,shu4$day,mean)
+
+mean4.sg<-mean(shu4$shenggou)
+mean4.sh<-mean(shu4$shuhui)
+
+#计算周期性星期类指数（非标准计算方法，仅供参考）
+week.shenggou.rate<-as.numeric(as.character(shu4.week.sg))/mean4.sg
+week.shuhui.rate<-as.numeric(as.character(shu4.week.sh))/mean4.sh
+
+days<-1:30
+shu4.sg<-as.numeric(as.character(shu4.day.sg))[1:30]
+shu4.sh<-as.numeric(as.character(shu4.day.sh))[1:30]
+da<-data.frame(days,shu4.sg,shu4.sh)
+names.da<-names(da)
+
+#用来记录每个日次含有几个星期-到星期日
+da[,4:10]<-0
+names(da)<-c(names.da,c(1:7))
+da$rate_day_sg<-0
+da$rate_day_sh<-0
+for(i in 1:30){
+  for(j in 1:7){
+    
+    da[i,(j+3)]<-nrow(shu4[shu4$week==j & shu4$day==i,])
+    
+  }
+  
+}
+
+#计算星期对日期的影响
+for(i in 1:30){
+  da[i,11]<-sum(week.shenggou.rate*da[i,c(4:10)])/sum(da[i,c(4:10)])
+  da[i,12]<-sum(week.shuhui.rate*da[i,c(4:10)])/sum(da[i,c(4:10)])
+}
+
+#结果
+day<-20140901:20140930
+dsg<-da$shu4.sg/da$rate_day_sg*week.shenggou.rate
+dsh<-da$shu4.sh/da$rate_day_sh*week.shuhui.rate
+
+xx<-data.frame(day,dsg,dsh)
+```
+
